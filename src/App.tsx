@@ -397,6 +397,42 @@ function App() {
           </div>
         </header>
 
+        <div className="support-card" aria-label="Support links">
+          <div className="support-title">Buy me a coffee</div>
+          <div className="support-links">
+            <a
+              className="support-link github"
+              href="https://github.com/sponsors/gintarasj77"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub Sponsors"
+              title="GitHub Sponsors"
+            >
+              <img
+                className="support-logo"
+                alt=""
+                src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+              />
+              <span className="support-label">GitHub</span>
+            </a>
+            <a
+              className="support-link stripe"
+              href="https://buy.stripe.com/28E3cneUn18y3ajgvd67S00"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Stripe"
+              title="Stripe"
+            >
+              <img
+                className="support-logo"
+                alt=""
+                src="https://stripe.com/favicon.ico"
+              />
+              <span className="support-label">Stripe</span>
+            </a>
+          </div>
+        </div>
+
         <section className="map-panel">
           <MapContainer
             center={mapCenter}
