@@ -50,6 +50,7 @@ App URL: `http://localhost:5173`
 | --- | --- |
 | `npm run dev` | Start Vite dev server |
 | `npm run test` | Run unit tests |
+| `npm run test:e2e` | Run Playwright smoke test |
 | `npm run lint` | Run ESLint |
 | `npm run build` | Build production bundle |
 | `npm run serve` | Serve production build via Express |
@@ -84,6 +85,14 @@ Additional server env vars:
 - `GET /api/route`
   - Proxies Bus 117 polyline file
 
+## Observability
+
+- API responses include `x-request-id` for request correlation.
+- Server logs are structured JSON and include:
+  - request start/finish
+  - upstream retry attempts
+  - upstream timeout/proxy errors
+
 ## Testing
 
 Run tests locally:
@@ -97,6 +106,7 @@ Covered behavior includes:
 - Polyline decoding
 - GPS feed parsing
 - Backend proxy success/error handling with mocked upstream fetch
+- Browser smoke flow (app load, map render, API responses)
 
 ## CI
 
@@ -106,6 +116,7 @@ GitHub Actions workflow runs:
 - `npm run lint`
 - `npm run test`
 - `npm run build`
+- `npm run test:e2e`
 
 ## Releases
 

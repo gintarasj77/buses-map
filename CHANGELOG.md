@@ -9,15 +9,17 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- TBD
+- Request correlation headers (`x-request-id`) for API responses.
+- Playwright smoke test covering app load, map render, and API responsiveness.
 
 ### Changed
 
-- TBD
+- CI now installs Chromium and runs `npm run test:e2e`.
+- Proxy layer now emits structured request lifecycle and retry logs.
 
 ### Fixed
 
-- TBD
+- Retry/timeout events are now observable with request-scoped log context.
 
 ## [0.1.1] - 2026-02-24
 

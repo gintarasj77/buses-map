@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run tests",
+    "test:e2e": "playwright test",
     "preview": "vite preview",
     "serve": "node server.js"
   },
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.58.2",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",

@@ -15,6 +15,7 @@ Use this checklist for each release (`vX.Y.Z`).
 - Run all checks:
   - `npm run lint`
   - `npm run test`
+  - `npm run test:e2e`
   - `npm run build`
 - Confirm working tree is clean except intended release changes.
 

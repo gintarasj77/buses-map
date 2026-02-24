@@ -1,4 +1,5 @@
 import express from 'express'
+import { randomUUID } from 'crypto'
 import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 
@@ -17,6 +18,25 @@ class UpstreamTimeoutError extends Error {
   }
 }
 
+function logEvent(level, event, details = {}) {
+  const payload = {
+    ts: new Date().toISOString(),
+    level,
+    event,
+    ...details,
+  }
+  const line = JSON.stringify(payload)
+  if (level === 'error') {
+    console.error(line)
+    return
+  }
+  if (level === 'warn') {
+    console.warn(line)
+    return
+  }
+  console.log(line)
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -31,9 +51,12 @@ async function fetchWithRetries({
   init = {},
   timeoutMs,
   retries,
+  requestId,
+  logger,
 }) {
   let lastError
   for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const startedAt = Date.now()
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
     try {
@@ -43,14 +66,33 @@ async function fetchWithRetries({
       if (!RETRYABLE_STATUS_CODES.has(response.status) || attempt === retries) {
         return response
       }
+
+      logger('warn', 'upstream.retry.status', {
+        requestId,
+        url,
+        status: response.status,
+        attempt: attempt + 1,
+        maxAttempts: retries + 1,
+        durationMs: Date.now() - startedAt,
+      })
     } catch (error) {
       clearTimeout(timeoutId)
+      const timedOut = isAbortError(error)
       lastError = isAbortError(error)
         ? new UpstreamTimeoutError(`Upstream timeout after ${timeoutMs}ms`)
         : error
       if (attempt === retries) {
         throw lastError
       }
+
+      logger('warn', timedOut ? 'upstream.retry.timeout' : 'upstream.retry.error', {
+        requestId,
+        url,
+        attempt: attempt + 1,
+        maxAttempts: retries + 1,
+        durationMs: Date.now() - startedAt,
+        message: String(error?.message || error),
+      })
     }
 
     const backoffMs = 200 * (attempt + 1)
@@ -67,16 +109,46 @@ export function createApp({
   fetchImpl = fetch,
   upstreamTimeoutMs = DEFAULT_UPSTREAM_TIMEOUT_MS,
   upstreamRetries = DEFAULT_UPSTREAM_RETRIES,
+  logger = logEvent,
 } = {}) {
   const app = express()
 
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/api/')) {
+      next()
+      return
+    }
+    const requestId = randomUUID()
+    const startedAt = Date.now()
+    req.requestId = requestId
+    res.set('x-request-id', requestId)
+    logger('info', 'request.start', {
+      requestId,
+      method: req.method,
+      path: req.originalUrl,
+    })
+    res.on('finish', () => {
+      logger('info', 'request.finish', {
+        requestId,
+        method: req.method,
+        path: req.originalUrl,
+        status: res.statusCode,
+        durationMs: Date.now() - startedAt,
+      })
+    })
+    next()
+  })
+
   app.get('/api/gps', async (req, res) => {
+    const requestId = req.requestId
     try {
       const upstream = await fetchWithRetries({
         fetchImpl,
         url: TARGET_URL,
         timeoutMs: upstreamTimeoutMs,
         retries: upstreamRetries,
+        requestId,
+        logger,
         init: {
           headers: {
             ...(req.header('if-none-match') ? { 'If-None-Match': req.header('if-none-match') } : {}),
@@ -109,20 +181,33 @@ export function createApp({
       res.send(body)
     } catch (err) {
       if (err instanceof UpstreamTimeoutError) {
+        logger('warn', 'upstream.timeout', {
+          requestId,
+          endpoint: '/api/gps',
+          timeoutMs: upstreamTimeoutMs,
+        })
         res.status(504).send('Upstream timeout')
         return
       }
+      logger('error', 'upstream.proxy_error', {
+        requestId,
+        endpoint: '/api/gps',
+        message: String(err?.message || err),
+      })
       res.status(502).send('Proxy error')
     }
   })
 
-  app.get('/api/route', async (_, res) => {
+  app.get('/api/route', async (req, res) => {
+    const requestId = req.requestId
     try {
       const upstream = await fetchWithRetries({
         fetchImpl,
         url: ROUTE_URL,
         timeoutMs: upstreamTimeoutMs,
         retries: upstreamRetries,
+        requestId,
+        logger,
       })
       if (!upstream.ok) {
         res.status(upstream.status).send('Failed to fetch route')
@@ -133,9 +218,19 @@ export function createApp({
       res.send(body)
     } catch (err) {
       if (err instanceof UpstreamTimeoutError) {
+        logger('warn', 'upstream.timeout', {
+          requestId,
+          endpoint: '/api/route',
+          timeoutMs: upstreamTimeoutMs,
+        })
         res.status(504).send('Upstream timeout')
         return
       }
+      logger('error', 'upstream.proxy_error', {
+        requestId,
+        endpoint: '/api/route',
+        message: String(err?.message || err),
+      })
       res.status(502).send('Proxy error')
     }
   })

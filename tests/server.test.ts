@@ -19,6 +19,7 @@ describe('API proxy routes', () => {
       fetchImpl: fetchMock as unknown as typeof fetch,
       upstreamRetries,
       upstreamTimeoutMs,
+      logger: () => {},
     })
     server = app.listen(0)
     await new Promise<void>((resolve) => {
@@ -69,6 +70,7 @@ describe('API proxy routes', () => {
       'Mon, 01 Jan 2024 00:00:00 GMT',
     )
     expect(response.headers.get('content-type')).toContain('text/plain')
+    expect(response.headers.get('x-request-id')).toBeTruthy()
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0] as [
@@ -126,6 +128,7 @@ describe('API proxy routes', () => {
     expect(response.status).toBe(200)
     expect(await response.text()).toBe('route-body')
     expect(response.headers.get('content-type')).toContain('text/plain')
+    expect(response.headers.get('x-request-id')).toBeTruthy()
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://www.stops.lt/vilnius/vilnius/vilnius_bus_117.txt',
