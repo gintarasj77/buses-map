@@ -1,68 +1,97 @@
 # Vilnius Bus 117 Live Tracker
 
-Real-time tracker focused on one route only: Vilnius Bus 117.
+Single-route real-time tracker for Vilnius Bus `117`.
+
+## Overview
+
+This app renders live Bus 117 vehicle positions on a map, overlays both route
+directions, and updates on a polling loop with smooth marker animation.
 
 ## Features
 
-- Live GPS updates every 3 seconds for route `117`
-- Two route directions: `Pilait&#279; -> Platini&#353;k&#279;s` and reverse
-- Interactive map with street and satellite layers
-- Material-inspired dark UI
-- Responsive layout for desktop and mobile
+- Live GPS polling every 3 seconds
+- Route direction toggle: `Pilait&#279; -> Platini&#353;k&#279;s` and reverse
+- Street and satellite map layers
+- Empty-feed and stale-data UI states
+- Material-inspired dark theme
+- Responsive desktop/mobile layout
 
-## Tech Stack
+## Stack
 
 - Frontend: React 19, TypeScript, Vite, React Leaflet
-- Backend: Express production proxy
+- Backend: Express proxy server
 - Data source: `https://www.stops.lt/vilnius/gps.txt`
+- Tests: Vitest
 
-## Development
+## Prerequisites
 
-### Prerequisites
-
-- Node.js 20.x
+- Node.js `20.x`
 - npm
 
-### Install
+## Quick Start
+
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-### Start dev server
+Run development server:
 
 ```bash
 npm run dev
 ```
 
-App runs at `http://localhost:5173`.
+App URL: `http://localhost:5173`
 
-### Run unit tests
+## Scripts
 
-```bash
-npm run test
-```
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Start Vite dev server |
+| `npm run test` | Run unit tests |
+| `npm run lint` | Run ESLint |
+| `npm run build` | Build production bundle |
+| `npm run serve` | Serve production build via Express |
 
 ## Production
 
-### Build
+Build:
 
 ```bash
 npm run build
 ```
 
-### Serve build
+Serve:
 
 ```bash
 npm run serve
 ```
 
-Server runs at `http://localhost:4173` (or `PORT` env var).
+Server URL: `http://localhost:4173` (or `PORT` env var).
 
 ## API
 
-- `GET /api/gps`: proxy to live GPS feed
-- `GET /api/route`: proxy to Bus 117 route polyline file
+- `GET /api/gps`
+  - Proxies live GPS feed
+  - Supports conditional headers (`If-None-Match`, `If-Modified-Since`)
+  - Returns passthrough `ETag` and `Last-Modified` when provided upstream
+- `GET /api/route`
+  - Proxies Bus 117 polyline file
+
+## Testing
+
+Run tests locally:
+
+```bash
+npm run test
+```
+
+Covered behavior includes:
+
+- Polyline decoding
+- GPS feed parsing
+- Backend proxy success/error handling with mocked upstream fetch
 
 ## CI
 
@@ -81,11 +110,23 @@ buses-map/
     App.tsx
     App.css
     index.css
+    lib/transit.ts
     main.tsx
+  tests/
+    transit.test.ts
+    server.test.ts
   server.js
   vite.config.ts
   package.json
 ```
+
+## Troubleshooting
+
+- `ERR_BLOCKED_BY_CLIENT` for analytics: tracking scripts were removed from
+  `index.html`; if seen in old tabs, hard refresh.
+- No buses visible: feed can temporarily return no vehicles for route `117`.
+- Stale data banner: upstream data has not refreshed yet; app retries
+  automatically.
 
 ## License
 
