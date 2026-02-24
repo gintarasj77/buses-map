@@ -1,17 +1,19 @@
 :root {
-  --md-color-primary: #005ac1;
-  --md-color-on-primary: #ffffff;
-  --md-color-primary-container: #d9e2ff;
-  --md-color-on-primary-container: #001a42;
-  --md-color-surface: #f7f9ff;
-  --md-color-surface-container: #eef2fb;
-  --md-color-surface-container-high: #e4e9f5;
-  --md-color-outline: #6f7786;
-  --md-color-error-container: #ffdad6;
-  --md-color-on-error-container: #410002;
-  --md-shadow-1: 0 1px 2px rgba(14, 30, 54, 0.12);
-  --md-shadow-2: 0 4px 12px rgba(14, 30, 54, 0.18);
-  --md-shadow-3: 0 12px 28px rgba(14, 30, 54, 0.24);
+  --md-color-primary: #adc6ff;
+  --md-color-on-primary: #002e69;
+  --md-color-primary-container: #19458a;
+  --md-color-on-primary-container: #d9e2ff;
+  --md-color-surface: #0f141d;
+  --md-color-surface-container: #171d28;
+  --md-color-surface-container-high: #1e2634;
+  --md-color-outline: #8790a3;
+  --md-color-error-container: #8c1d18;
+  --md-color-on-error-container: #ffd9d6;
+  --md-color-text-primary: #e5eaf5;
+  --md-color-text-muted: #aeb7ca;
+  --md-shadow-1: 0 2px 6px rgba(0, 0, 0, 0.26);
+  --md-shadow-2: 0 10px 24px rgba(0, 0, 0, 0.32);
+  --md-shadow-3: 0 20px 40px rgba(0, 0, 0, 0.44);
 }
 
 .app-shell {
@@ -20,12 +22,12 @@
   margin: 0;
   position: relative;
   background: radial-gradient(
-    circle at 10% 15%,
-    #e7efff 0%,
-    #f7f9ff 42%,
-    #edf2fb 100%
+    circle at 14% 12%,
+    #1f2c44 0%,
+    #131925 46%,
+    #0c1119 100%
   );
-  color: #172235;
+  color: var(--md-color-text-primary);
 }
 
 .app-shell::before {
@@ -33,7 +35,9 @@
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(160deg, rgba(0, 90, 193, 0.04), transparent 50%);
+  background:
+    linear-gradient(145deg, rgba(173, 198, 255, 0.09), transparent 46%),
+    radial-gradient(circle at 84% 92%, rgba(31, 73, 143, 0.2), transparent 36%);
 }
 
 .layout {
@@ -50,6 +54,7 @@
   border-radius: 28px;
   overflow: hidden;
   background: var(--md-color-surface);
+  border: 1px solid rgba(135, 144, 163, 0.2);
   box-shadow: var(--md-shadow-3);
 }
 
@@ -67,8 +72,8 @@
   max-width: calc(100vw - 80px);
   padding: 24px 20px;
   border-radius: 28px;
-  background: rgba(247, 249, 255, 0.92);
-  border: 1px solid rgba(111, 119, 134, 0.24);
+  background: rgba(23, 29, 40, 0.88);
+  border: 1px solid rgba(135, 144, 163, 0.28);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   box-shadow: var(--md-shadow-2);
@@ -95,7 +100,7 @@
   padding: 10px 12px;
   border-radius: 16px;
   background: var(--md-color-surface-container);
-  border: 1px solid rgba(111, 119, 134, 0.2);
+  border: 1px solid rgba(135, 144, 163, 0.25);
 }
 
 .label {
@@ -103,13 +108,13 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #4f596a;
+  color: var(--md-color-text-muted);
 }
 
 .value {
   font-size: 19px;
   font-weight: 600;
-  color: #102034;
+  color: var(--md-color-text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -143,7 +148,7 @@
 }
 
 .satellite-toggle:focus-visible {
-  outline: 3px solid rgba(0, 90, 193, 0.3);
+  outline: 3px solid rgba(173, 198, 255, 0.4);
   outline-offset: 2px;
 }
 
@@ -159,7 +164,7 @@
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--md-color-on-error-container);
-  border: 1px solid rgba(65, 0, 2, 0.16);
+  border: 1px solid rgba(255, 217, 214, 0.22);
   background: var(--md-color-error-container);
 }
 
@@ -170,8 +175,8 @@
   z-index: 1000;
   padding: 14px;
   border-radius: 20px;
-  background: rgba(247, 249, 255, 0.95);
-  border: 1px solid rgba(111, 119, 134, 0.24);
+  background: rgba(23, 29, 40, 0.92);
+  border: 1px solid rgba(135, 144, 163, 0.28);
   box-shadow: var(--md-shadow-2);
 }
 
@@ -181,7 +186,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #4f596a;
+  color: var(--md-color-text-muted);
 }
 
 .support-links {
@@ -193,15 +198,15 @@
   width: 98px;
   height: 74px;
   border-radius: 16px;
-  border: 1px solid rgba(111, 119, 134, 0.3);
+  border: 1px solid rgba(135, 144, 163, 0.36);
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
   text-decoration: none;
-  color: #1a2a43;
-  background: var(--md-color-surface-container);
+  color: var(--md-color-text-primary);
+  background: var(--md-color-surface-container-high);
   box-shadow: var(--md-shadow-1);
   transition:
     transform 0.2s ease,
@@ -210,11 +215,11 @@
 }
 
 .support-link.github {
-  border-color: #8fa0bf;
+  border-color: #6d7fa4;
 }
 
 .support-link.stripe {
-  border-color: #8e9de0;
+  border-color: #6f73b7;
 }
 
 .support-link:hover {
@@ -246,13 +251,23 @@
 
 .map .leaflet-control-zoom a {
   border: 0;
-  background: rgba(247, 249, 255, 0.94);
-  color: #21304a;
+  background: rgba(23, 29, 40, 0.94);
+  color: var(--md-color-text-primary);
+}
+
+.map .leaflet-control-zoom a:hover {
+  background: rgba(30, 38, 52, 0.96);
 }
 
 .map .leaflet-popup-content-wrapper {
   border-radius: 16px;
   box-shadow: var(--md-shadow-2);
+  background: rgba(20, 26, 36, 0.95);
+  color: var(--md-color-text-primary);
+}
+
+.map .leaflet-popup-tip {
+  background: rgba(20, 26, 36, 0.95);
 }
 
 .map .leaflet-popup-content {

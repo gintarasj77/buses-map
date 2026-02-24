@@ -336,8 +336,8 @@ function App() {
     : [54.6872, 25.2797]
   const routeDirectionLabel =
     routeDirection === 'ab'
-      ? 'Pilaites -> Platiniskes'
-      : 'Platiniskes -> Pilaites'
+      ? 'Pilaitė -> Platiniškės'
+      : 'Platiniškės -> Pilaitė'
 
   return (
     <div className="app-shell">
