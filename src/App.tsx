@@ -14,6 +14,7 @@ const GPS_URL = '/api/gps'
 const ROUTE_URL = '/api/route'
 const ROUTE_ID = '117'
 const POLL_MS = 3_000
+const STALE_AFTER_MS = POLL_MS * 4
 
 function createHeadingIcon(headingDeg: number): DivIcon {
   const normalized = Number.isFinite(headingDeg)
@@ -98,8 +99,18 @@ function App() {
   const [routeDirection, setRouteDirection] = useState<'ab' | 'ba'>('ba')
   const [routeData, setRouteData] = useState<RouteData>({ ab: [], ba: [] })
   const [routeError, setRouteError] = useState<string | null>(null)
+  const [clockMs, setClockMs] = useState(() => Date.now())
   const animRef = useRef<number | undefined>(undefined)
   const animStatesRef = useRef<Map<string, AnimState>>(new Map())
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setClockMs(Date.now())
+    }, 10_000)
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -262,6 +273,10 @@ function App() {
   const mapCenter: [number, number] = renderVehicles.length
     ? [renderVehicles[0]?.lat ?? 54.6872, renderVehicles[0]?.lon ?? 25.2797]
     : [54.6872, 25.2797]
+  const hasLoadedData = lastUpdated !== null
+  const isEmptyState = hasLoadedData && vehicles.length === 0 && !error
+  const isDataStale =
+    hasLoadedData && clockMs - lastUpdated.getTime() > STALE_AFTER_MS
   const routeDirectionLabel =
     routeDirection === 'ab'
       ? 'Pilait\u0117 -> Platini\u0161k\u0117s'
@@ -299,6 +314,16 @@ function App() {
 
             {error ? <div className="error">Error: {error}</div> : null}
             {routeError ? <div className="error">Route: {routeError}</div> : null}
+            {isEmptyState ? (
+              <div className="status-note">
+                No Bus {ROUTE_ID} vehicles are visible right now.
+              </div>
+            ) : null}
+            {isDataStale && !error ? (
+              <div className="status-note stale">
+                Data is stale. Waiting for a fresh GPS update.
+              </div>
+            ) : null}
           </div>
         </header>
 

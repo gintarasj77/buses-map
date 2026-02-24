@@ -168,6 +168,23 @@
   background: var(--md-color-error-container);
 }
 
+.status-note {
+  border-radius: 14px;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--md-color-on-primary-container);
+  border: 1px solid rgba(173, 198, 255, 0.3);
+  background: rgba(25, 69, 138, 0.42);
+}
+
+.status-note.stale {
+  color: #ffe8c0;
+  border-color: rgba(255, 193, 87, 0.34);
+  background: rgba(112, 72, 5, 0.45);
+}
+
 .support-card {
   position: absolute;
   right: 40px;
