@@ -102,6 +102,11 @@ GitHub Actions workflow runs:
 - `npm run test`
 - `npm run build`
 
+## Releases
+
+- Changelog: `CHANGELOG.md`
+- Process checklist: `RELEASE_CHECKLIST.md`
+
 ## Project Structure
 
 ```text
