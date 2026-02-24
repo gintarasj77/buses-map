@@ -5,7 +5,7 @@ Real-time tracker focused on one route only: Vilnius Bus 117.
 ## Features
 
 - Live GPS updates every 3 seconds for route `117`
-- Two route directions: `Pilaitė -> Platiniškės` and reverse
+- Two route directions: `Pilait&#279; -> Platini&#353;k&#279;s` and reverse
 - Interactive map with street and satellite layers
 - Material-inspired dark UI
 - Responsive layout for desktop and mobile
@@ -20,7 +20,7 @@ Real-time tracker focused on one route only: Vilnius Bus 117.
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20.x
 - npm
 
 ### Install
@@ -70,6 +70,7 @@ GitHub Actions workflow runs:
 
 - `npm ci`
 - `npm run lint`
+- `npm run test`
 - `npm run build`
 
 ## Project Structure
