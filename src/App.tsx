@@ -43,6 +43,11 @@ type Vehicle = {
   vehicleId: string
 }
 
+type RouteData = {
+  ab: Array<[number, number]>[]
+  ba: Array<[number, number]>[]
+}
+
 const GPS_URL = '/api/gps'
 const POLL_MS = 3_000
 
@@ -105,7 +110,15 @@ function parseGpsFeed(text: string): Vehicle[] {
     .filter((vehicle) => Number.isFinite(vehicle.lat) && Number.isFinite(vehicle.lon))
 }
 
-function FitToVehicles({ vehicles, routes, routeKey }: { vehicles: Vehicle[]; routes: { ab: Array<[number, number]>[]; ba: Array<[number, number]>[] }; routeKey: string }) {
+function FitToVehicles({
+  vehicles,
+  routes,
+  routeKey,
+}: {
+  vehicles: Vehicle[]
+  routes: RouteData
+  routeKey: string
+}) {
   const map = useMap()
   const prevRouteKey = useRef(routeKey)
   const hasFitForRoute = useRef(false)
@@ -151,14 +164,14 @@ type AnimState = {
 function App() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [renderVehicles, setRenderVehicles] = useState<Vehicle[]>([])
-  const [animStates, setAnimStates] = useState<Map<string, AnimState>>(new Map())
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [satelliteMode, setSatelliteMode] = useState(false)
   const [routeDirection, setRouteDirection] = useState<'ab' | 'ba'>('ba')
-  const [routeData, setRouteData] = useState<{ ab: Array<[number, number]>[]; ba: Array<[number, number]>[] }>({ ab: [], ba: [] })
+  const [routeData, setRouteData] = useState<RouteData>({ ab: [], ba: [] })
   const [routeError, setRouteError] = useState<string | null>(null)
   const animRef = useRef<number | undefined>(undefined)
+  const animStatesRef = useRef<Map<string, AnimState>>(new Map())
 
   useEffect(() => {
     let cancelled = false
@@ -269,60 +282,30 @@ function App() {
     setRenderVehicles((prev) => {
       const prevMap = new Map(prev.map((v) => [v.vehicleId, v]))
       const now = performance.now()
-      const newAnimStates = new Map<string, AnimState>()
       const ANIM_DURATION = 2_500
 
-      return vehicles
-        .map((v) => {
-          const prevV = prevMap.get(v.vehicleId)
-          if (!prevV) {
-            newAnimStates.set(v.vehicleId, {
-              vehicleId: v.vehicleId,
-              startLat: v.lat,
-              startLon: v.lon,
-              endLat: v.lat,
-              endLon: v.lon,
-              startTime: now,
-              duration: ANIM_DURATION,
-            })
-            return v
-          }
-          newAnimStates.set(v.vehicleId, {
-            vehicleId: v.vehicleId,
-            startLat: prevV.lat,
-            startLon: prevV.lon,
-            endLat: v.lat,
-            endLon: v.lon,
-            startTime: now,
-            duration: ANIM_DURATION,
-          })
-          return v
+      const nextAnimStates = new Map<string, AnimState>()
+      const nextRenderVehicles = vehicles.map((v) => {
+        const prevV = prevMap.get(v.vehicleId)
+        const startLat = prevV?.lat ?? v.lat
+        const startLon = prevV?.lon ?? v.lon
+
+        nextAnimStates.set(v.vehicleId, {
+          vehicleId: v.vehicleId,
+          startLat,
+          startLon,
+          endLat: v.lat,
+          endLon: v.lon,
+          startTime: now,
+          duration: ANIM_DURATION,
         })
-        .map((v) => {
-          const state = newAnimStates.get(v.vehicleId)
-          return { ...v, lat: state?.startLat ?? v.lat, lon: state?.startLon ?? v.lon }
-        })
+
+        return { ...v, lat: startLat, lon: startLon }
+      })
+
+      animStatesRef.current = nextAnimStates
+      return nextRenderVehicles
     })
-    setAnimStates(
-      new Map(
-        vehicles.map((v) => {
-          const prevV = renderVehicles.find((pv) => pv.vehicleId === v.vehicleId)
-          const now = performance.now()
-          return [
-            v.vehicleId,
-            {
-              vehicleId: v.vehicleId,
-              startLat: prevV?.lat ?? v.lat,
-              startLon: prevV?.lon ?? v.lon,
-              endLat: v.lat,
-              endLon: v.lon,
-              startTime: now,
-              duration: 2_500,
-            },
-          ] as [string, AnimState]
-        }),
-      ),
-    )
   }, [vehicles])
 
   useEffect(() => {
@@ -330,7 +313,7 @@ function App() {
       const now = performance.now()
       setRenderVehicles((prev) => {
         return prev.map((v) => {
-          const state = animStates.get(v.vehicleId)
+          const state = animStatesRef.current.get(v.vehicleId)
           if (!state) return v
           const elapsed = now - state.startTime
           const progress = Math.min(elapsed / state.duration, 1)
@@ -344,44 +327,38 @@ function App() {
     }
     animRef.current = requestAnimationFrame(animate)
     return () => {
-      if (animRef.current) cancelAnimationFrame(animRef.current)
+      if (animRef.current !== undefined) cancelAnimationFrame(animRef.current)
     }
-  }, [animStates])
+  }, [])
 
   const mapCenter: [number, number] = renderVehicles.length
     ? [renderVehicles[0]?.lat ?? 54.6872, renderVehicles[0]?.lon ?? 25.2797]
     : [54.6872, 25.2797]
+  const routeDirectionLabel =
+    routeDirection === 'ab'
+      ? 'Pilaites -> Platiniskes'
+      : 'Platiniskes -> Pilaites'
 
   return (
     <div className="app-shell">
       <div className="layout">
         <header className="topbar">
-          <h1 style={{ 
-            margin: '0', 
-            fontSize: '28px', 
-            fontWeight: '700',
-            background: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
-          }}>
-            Bus 117
-          </h1>
-          
+          <h1 className="app-title">Bus 117</h1>
+
           <div className="meta">
             <div className="meta-row">
-              <span className="label">Last Update</span>
+              <span className="label">Last update</span>
               <span className="value">
                 {lastUpdated ? lastUpdated.toLocaleTimeString() : 'Loading...'}
               </span>
             </div>
 
             <button
-              className="satellite-toggle"
+              className={`satellite-toggle ${satelliteMode ? 'is-active' : ''}`}
               onClick={() => setSatelliteMode(!satelliteMode)}
-              title="Toggle satellite view"
+              title="Toggle map style"
             >
-              {satelliteMode ? '🗺️ Street Map' : '🛰️ Satellite View'}
+              {satelliteMode ? 'Street map' : 'Satellite view'}
             </button>
             
             <button
@@ -389,11 +366,11 @@ function App() {
               onClick={() => setRouteDirection(routeDirection === 'ab' ? 'ba' : 'ab')}
               title="Toggle route direction"
             >
-              {routeDirection === 'ab' ? '🔄 Pilaitė → Platiniškės' : '🔄 Platiniškės → Pilaitė'}
+              {`Direction: ${routeDirectionLabel}`}
             </button>
 
-            {error ? <div className="error">⚠️ {error}</div> : null}
-            {routeError ? <div className="error">⚠️ {routeError}</div> : null}
+            {error ? <div className="error">Error: {error}</div> : null}
+            {routeError ? <div className="error">Route: {routeError}</div> : null}
           </div>
         </header>
 
@@ -441,10 +418,18 @@ function App() {
             scrollWheelZoom
           >
             <TileLayer
-              attribution={satelliteMode ? '&copy; Mapbox' : '&copy; OpenStreetMap contributors'}
+              attribution={
+                satelliteMode
+                  ? '&copy; Esri, Maxar, Earthstar Geographics'
+                  : '&copy; OpenStreetMap contributors'
+              }
               url={satelliteMode ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'}
             />
-            <FitToVehicles vehicles={renderVehicles} routes={{ ab: [routeData.ab[0] || []], ba: [routeData.ba[0] || []] }} routeKey="117-0" />
+            <FitToVehicles
+              vehicles={renderVehicles}
+              routes={routeData}
+              routeKey="117-0"
+            />
             {routeDirection === 'ab' && routeData.ab.length > 0 && routeData.ab[0].length > 0 && (
               <Polyline positions={routeData.ab[0]} color="#0ea5e9" weight={5} opacity={0.8} />
             )}
@@ -453,7 +438,7 @@ function App() {
             )}
             {renderVehicles.map((vehicle) => (
               <Marker
-                key={`${vehicle.route}-${vehicle.vehicleId}-${vehicle.lat}-${vehicle.lon}`}
+                key={`${vehicle.route}-${vehicle.vehicleId}`}
                 position={[vehicle.lat, vehicle.lon]}
                 icon={createHeadingIcon(vehicle.headingDeg, vehicle.mode)}
               >
@@ -463,7 +448,7 @@ function App() {
                     <div style={{ marginTop: '8px', fontSize: '13px', lineHeight: '1.6' }}>
                       <div><strong>Vehicle ID:</strong> {vehicle.vehicleId}</div>
                       <div><strong>Speed:</strong> {vehicle.speedKmh} km/h</div>
-                      <div><strong>Heading:</strong> {vehicle.headingDeg}°</div>
+                      <div><strong>Heading:</strong> {vehicle.headingDeg} deg</div>
                       <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
                         {vehicle.lat.toFixed(5)}, {vehicle.lon.toFixed(5)}
                       </div>

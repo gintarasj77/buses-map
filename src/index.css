@@ -1,7 +1,7 @@
 :root {
-  font-family: "Manrope", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-family: "Roboto", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   line-height: 1.5;
-  font-weight: 500;
+  font-weight: 400;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
@@ -13,8 +13,19 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at 25% 20%, #1e293b, #0f172a 55%, #0b1220 100%);
-  color: #e5e7eb;
+  background: #eef2fb;
+  color: #172235;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }
 
 a {
