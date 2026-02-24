@@ -37,6 +37,12 @@ npm run dev
 
 App runs at `http://localhost:5173`.
 
+### Run unit tests
+
+```bash
+npm run test
+```
+
 ## Production
 
 ### Build
