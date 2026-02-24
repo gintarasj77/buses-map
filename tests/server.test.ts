@@ -1,27 +1,37 @@
 import type { AddressInfo } from 'node:net'
 import type { Server } from 'node:http'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from '../server.js'
 
 describe('API proxy routes', () => {
-  let server: Server
-  let baseUrl = ''
+  let server: Server | undefined
   const fetchMock = vi.fn()
 
-  beforeEach(async () => {
+  async function startTestServer({
+    upstreamRetries = 0,
+    upstreamTimeoutMs = 500,
+  }: {
+    upstreamRetries?: number
+    upstreamTimeoutMs?: number
+  } = {}) {
     fetchMock.mockReset()
-    const app = createApp({ fetchImpl: fetchMock as unknown as typeof fetch })
+    const app = createApp({
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      upstreamRetries,
+      upstreamTimeoutMs,
+    })
     server = app.listen(0)
     await new Promise<void>((resolve) => {
-      server.on('listening', () => resolve())
+      server?.on('listening', () => resolve())
     })
     const address = server.address() as AddressInfo
-    baseUrl = `http://127.0.0.1:${address.port}`
-  })
+    return `http://127.0.0.1:${address.port}`
+  }
 
   afterEach(async () => {
+    if (!server) return
     await new Promise<void>((resolve, reject) => {
-      server.close((err) => {
+      server?.close((err) => {
         if (err) {
           reject(err)
           return
@@ -29,9 +39,11 @@ describe('API proxy routes', () => {
         resolve()
       })
     })
+    server = undefined
   })
 
   it('proxies /api/gps and forwards conditional request headers', async () => {
+    const baseUrl = await startTestServer()
     fetchMock.mockResolvedValue(
       new Response('gps-body', {
         status: 200,
@@ -71,6 +83,7 @@ describe('API proxy routes', () => {
   })
 
   it('returns 304 from /api/gps when upstream is not modified', async () => {
+    const baseUrl = await startTestServer()
     fetchMock.mockResolvedValue(new Response(null, { status: 304 }))
 
     const response = await fetch(`${baseUrl}/api/gps`)
@@ -80,7 +93,10 @@ describe('API proxy routes', () => {
   })
 
   it('passes through upstream error status/body for /api/gps', async () => {
-    fetchMock.mockResolvedValue(new Response('upstream unavailable', { status: 503 }))
+    const baseUrl = await startTestServer()
+    fetchMock.mockResolvedValue(
+      new Response('upstream unavailable', { status: 503 }),
+    )
 
     const response = await fetch(`${baseUrl}/api/gps`)
 
@@ -88,7 +104,21 @@ describe('API proxy routes', () => {
     expect(await response.text()).toBe('upstream unavailable')
   })
 
+  it('retries /api/gps on transient upstream status and succeeds', async () => {
+    const baseUrl = await startTestServer({ upstreamRetries: 1 })
+    fetchMock
+      .mockResolvedValueOnce(new Response('temporary issue', { status: 503 }))
+      .mockResolvedValueOnce(new Response('gps-recovered', { status: 200 }))
+
+    const response = await fetch(`${baseUrl}/api/gps`)
+
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('gps-recovered')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('returns route body from /api/route', async () => {
+    const baseUrl = await startTestServer()
     fetchMock.mockResolvedValue(new Response('route-body', { status: 200 }))
 
     const response = await fetch(`${baseUrl}/api/route`)
@@ -99,10 +129,12 @@ describe('API proxy routes', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://www.stops.lt/vilnius/vilnius/vilnius_bus_117.txt',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
   })
 
   it('returns 502 when upstream fetch throws', async () => {
+    const baseUrl = await startTestServer()
     fetchMock.mockRejectedValue(new Error('network down'))
 
     const gpsResponse = await fetch(`${baseUrl}/api/gps`)
@@ -112,5 +144,20 @@ describe('API proxy routes', () => {
     const routeResponse = await fetch(`${baseUrl}/api/route`)
     expect(routeResponse.status).toBe(502)
     expect(await routeResponse.text()).toBe('Proxy error')
+  })
+
+  it('returns 504 when upstream request times out', async () => {
+    const baseUrl = await startTestServer({ upstreamTimeoutMs: 30 })
+    fetchMock.mockImplementation((_url: string, init?: { signal?: AbortSignal }) => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+        })
+      })
+    })
+
+    const gpsResponse = await fetch(`${baseUrl}/api/gps`)
+    expect(gpsResponse.status).toBe(504)
+    expect(await gpsResponse.text()).toBe('Upstream timeout')
   })
 })

@@ -19,6 +19,25 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 - TBD
 
+## [0.1.1] - 2026-02-24
+
+### Added
+
+- Release process docs: `CHANGELOG.md` and `RELEASE_CHECKLIST.md`.
+- Configurable upstream resilience env vars:
+  - `UPSTREAM_TIMEOUT_MS`
+  - `UPSTREAM_RETRIES`
+- Additional backend tests for API proxy retry and timeout behavior.
+
+### Changed
+
+- Updated README with release-process links and server resilience settings.
+- API proxy now retries transient upstream statuses (`429`, `5xx`) with short backoff.
+
+### Fixed
+
+- API proxy now returns `504 Upstream timeout` when upstream requests exceed timeout.
+
 ## [0.1.0] - 2026-02-24
 
 ### Added

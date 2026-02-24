@@ -70,6 +70,11 @@ npm run serve
 
 Server URL: `http://localhost:4173` (or `PORT` env var).
 
+Additional server env vars:
+
+- `UPSTREAM_TIMEOUT_MS` (default: `8000`)
+- `UPSTREAM_RETRIES` (default: `1`)
+
 ## API
 
 - `GET /api/gps`
