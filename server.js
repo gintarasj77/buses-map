@@ -6,7 +6,7 @@ const app = express()
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PORT = process.env.PORT || 4173
 const TARGET_URL = 'https://www.stops.lt/vilnius/gps.txt'
-const ROUTE_BASE = 'https://www.stops.lt/vilnius/vilnius'
+const ROUTE_URL = 'https://www.stops.lt/vilnius/vilnius/vilnius_bus_117.txt'
 
 app.get('/api/gps', async (req, res) => {
   try {
@@ -44,25 +44,9 @@ app.get('/api/gps', async (req, res) => {
   }
 })
 
-app.get('/api/route/:bus', async (req, res) => {
+app.get('/api/route', async (_, res) => {
   try {
-    const rawBus = (req.params.bus || '117').replace(/[^0-9a-zA-Z_-]/g, '') || '117'
-    const bus = rawBus.toLowerCase()
-    const mode = parseInt(req.query.mode) || 0
-    
-    let url
-    if (mode === 1) {
-      // Trolley
-      url = `${ROUTE_BASE}/vilnius_trol_${bus}.txt`
-    } else if (/g/.test(bus)) {
-      // Express bus
-      url = `${ROUTE_BASE}/vilnius_expressbus_${bus}.txt`
-    } else {
-      // Regular bus
-      url = `${ROUTE_BASE}/vilnius_bus_${bus}.txt`
-    }
-
-    const upstream = await fetch(url)
+    const upstream = await fetch(ROUTE_URL)
     if (!upstream.ok) {
       res.status(upstream.status).send('Failed to fetch route')
       return

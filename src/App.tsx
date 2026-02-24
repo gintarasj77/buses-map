@@ -34,7 +34,6 @@ function decodePolyline(encoded: string): Array<[number, number]> {
 }
 
 type Vehicle = {
-  mode: number
   route: string
   lon: number
   lat: number
@@ -44,20 +43,21 @@ type Vehicle = {
 }
 
 type RouteData = {
-  ab: Array<[number, number]>[]
-  ba: Array<[number, number]>[]
+  ab: Array<[number, number]>
+  ba: Array<[number, number]>
 }
 
 const GPS_URL = '/api/gps'
+const ROUTE_URL = '/api/route'
+const ROUTE_ID = '117'
 const POLL_MS = 3_000
 
-function createHeadingIcon(headingDeg: number, mode: number): DivIcon {
+function createHeadingIcon(headingDeg: number): DivIcon {
   const normalized = Number.isFinite(headingDeg)
     ? ((headingDeg % 360) + 360) % 360
     : 0
-  const isTrolley = mode === 1
-  const strokeColor = isTrolley ? '#ef4444' : '#0ea5e9'
-  const fillColor = isTrolley ? '#dc2626' : '#1e293b'
+  const strokeColor = '#78a7ff'
+  const fillColor = '#152335'
   return new DivIcon({
     className: '',
     html: `
@@ -94,11 +94,10 @@ function parseGpsFeed(text: string): Vehicle[] {
     .map((line) => line.split(',').map((cell) => cell.trim()))
     .filter((cells) => cells.length >= 6)
     .map((cells) => {
-      const [modeRaw, route, lonRaw, latRaw, speedRaw, headingRaw, vehicleId] =
+      const [, route, lonRaw, latRaw, speedRaw, headingRaw, vehicleId] =
         cells
 
       return {
-        mode: Number(modeRaw) || 0,
         route,
         lon: Number(lonRaw) / 1_000_000,
         lat: Number(latRaw) / 1_000_000,
@@ -112,41 +111,30 @@ function parseGpsFeed(text: string): Vehicle[] {
 
 function FitToVehicles({
   vehicles,
-  routes,
-  routeKey,
+  routeData,
 }: {
   vehicles: Vehicle[]
-  routes: RouteData
-  routeKey: string
+  routeData: RouteData
 }) {
   const map = useMap()
-  const prevRouteKey = useRef(routeKey)
-  const hasFitForRoute = useRef(false)
+  const hasFit = useRef(false)
 
   useEffect(() => {
-    // Only fit when route changes
-    const routeChanged = prevRouteKey.current !== routeKey
-    if (routeChanged) {
-      prevRouteKey.current = routeKey
-      hasFitForRoute.current = false
-    }
-
-    // Only fit once per route selection
-    if (hasFitForRoute.current) return
-    if (vehicles.length === 0 && routes.ab[0]?.length === 0 && routes.ba[0]?.length === 0) return
+    if (hasFit.current) return
+    if (vehicles.length === 0 && routeData.ab.length === 0 && routeData.ba.length === 0) return
 
     const allPoints: Array<[number, number]> = [
       ...vehicles.map((v) => [v.lat, v.lon] as [number, number]),
-      ...(routes.ab[0] || []),
-      ...(routes.ba[0] || []),
+      ...routeData.ab,
+      ...routeData.ba,
     ]
 
     if (allPoints.length === 0) return
 
     const bounds = new LatLngBounds(allPoints)
     map.fitBounds(bounds, { padding: [40, 40] })
-    hasFitForRoute.current = true
-  }, [vehicles, routes, map, routeKey])
+    hasFit.current = true
+  }, [vehicles, routeData, map])
 
   return null
 }
@@ -200,7 +188,7 @@ function App() {
             lastModified = response.headers.get('last-modified') ?? lastModified
             const text = await response.text()
             const parsedRaw = parseGpsFeed(text)
-            const parsed = parsedRaw.filter((v) => v.route === '117')
+            const parsed = parsedRaw.filter((v) => v.route === ROUTE_ID)
             setVehicles(parsed)
             setLastUpdated(new Date())
             setError(null)
@@ -230,7 +218,7 @@ function App() {
       setRouteData({ ab: [], ba: [] })
       setRouteError(null)
       try {
-        const response = await fetch(`/api/route/117?mode=0`)
+        const response = await fetch(ROUTE_URL)
         if (!response.ok) {
           setRouteError(`Route fetch failed (${response.status})`)
           return
@@ -261,7 +249,7 @@ function App() {
         const baCoords = baPolyline ? decodePolyline(baPolyline) : []
 
         if (abCoords.length > 0 || baCoords.length > 0) {
-          setRouteData({ ab: [abCoords], ba: [baCoords] })
+          setRouteData({ ab: abCoords, ba: baCoords })
           setRouteError(null)
         } else {
           setRouteError('No route shape found')
@@ -336,8 +324,8 @@ function App() {
     : [54.6872, 25.2797]
   const routeDirectionLabel =
     routeDirection === 'ab'
-      ? 'Pilaitė -> Platiniškės'
-      : 'Platiniškės -> Pilaitė'
+      ? 'Pilait\u0117 -> Platini\u0161k\u0117s'
+      : 'Platini\u0161k\u0117s -> Pilait\u0117'
 
   return (
     <div className="app-shell">
@@ -427,20 +415,19 @@ function App() {
             />
             <FitToVehicles
               vehicles={renderVehicles}
-              routes={routeData}
-              routeKey="117-0"
+              routeData={routeData}
             />
-            {routeDirection === 'ab' && routeData.ab.length > 0 && routeData.ab[0].length > 0 && (
-              <Polyline positions={routeData.ab[0]} color="#0ea5e9" weight={5} opacity={0.8} />
+            {routeDirection === 'ab' && routeData.ab.length > 0 && (
+              <Polyline positions={routeData.ab} color="#0ea5e9" weight={5} opacity={0.8} />
             )}
-            {routeDirection === 'ba' && routeData.ba.length > 0 && routeData.ba[0].length > 0 && (
-              <Polyline positions={routeData.ba[0]} color="#0ea5e9" weight={5} opacity={0.8} />
+            {routeDirection === 'ba' && routeData.ba.length > 0 && (
+              <Polyline positions={routeData.ba} color="#0ea5e9" weight={5} opacity={0.8} />
             )}
             {renderVehicles.map((vehicle) => (
               <Marker
                 key={`${vehicle.route}-${vehicle.vehicleId}`}
                 position={[vehicle.lat, vehicle.lon]}
-                icon={createHeadingIcon(vehicle.headingDeg, vehicle.mode)}
+                icon={createHeadingIcon(vehicle.headingDeg)}
               >
                 <Popup>
                   <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -465,3 +452,4 @@ function App() {
 }
 
 export default App
+
