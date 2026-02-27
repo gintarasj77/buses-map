@@ -25,7 +25,7 @@ directions, and updates on a polling loop with smooth marker animation.
 
 ## Prerequisites
 
-- Node.js `20.x`
+- Node.js `20.x` to `25.x`
 - npm
 
 ## Quick Start
@@ -43,6 +43,7 @@ npm run dev
 ```
 
 App URL: `http://localhost:5173`
+Live URL: `https://bus-117-tracker.onrender.com/`
 
 ## Scripts
 

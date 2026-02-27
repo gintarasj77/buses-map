@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { MapContainer, Marker, Popup, Polyline, TileLayer, useMap } from 'react-leaflet'
 import { DivIcon, LatLngBounds } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -15,6 +15,7 @@ const ROUTE_URL = '/api/route'
 const ROUTE_ID = '117'
 const POLL_MS = 3_000
 const STALE_AFTER_MS = POLL_MS * 4
+const POSITION_EPSILON = 1e-7
 
 function createHeadingIcon(headingDeg: number): DivIcon {
   const normalized = Number.isFinite(headingDeg)
@@ -48,6 +49,19 @@ function createHeadingIcon(headingDeg: number): DivIcon {
     iconAnchor: [24, 24],
     popupAnchor: [0, -18],
   })
+}
+
+const headingIconCache = new Map<number, DivIcon>()
+
+function getHeadingIcon(headingDeg: number): DivIcon {
+  const normalized = Number.isFinite(headingDeg)
+    ? ((Math.round(headingDeg) % 360) + 360) % 360
+    : 0
+  const cached = headingIconCache.get(normalized)
+  if (cached) return cached
+  const icon = createHeadingIcon(normalized)
+  headingIconCache.set(normalized, icon)
+  return icon
 }
 
 function FitToVehicles({
@@ -102,6 +116,60 @@ function App() {
   const [clockMs, setClockMs] = useState(() => Date.now())
   const animRef = useRef<number | undefined>(undefined)
   const animStatesRef = useRef<Map<string, AnimState>>(new Map())
+  const renderVehiclesRef = useRef<Vehicle[]>([])
+
+  const startAnimationLoop = useCallback(() => {
+    if (animRef.current !== undefined) return
+
+    const animate = () => {
+      const now = performance.now()
+      let hasActiveAnimation = false
+
+      for (const state of animStatesRef.current.values()) {
+        if (now - state.startTime < state.duration) {
+          hasActiveAnimation = true
+          break
+        }
+      }
+
+      setRenderVehicles((prev) => {
+        let changed = false
+        const next = prev.map((v) => {
+          const state = animStatesRef.current.get(v.vehicleId)
+          if (!state) return v
+
+          const elapsed = now - state.startTime
+          const progress = Math.min(elapsed / state.duration, 1)
+          const easeProgress =
+            progress < 1 ? progress * progress * (3 - 2 * progress) : 1
+          const lat =
+            state.startLat + (state.endLat - state.startLat) * easeProgress
+          const lon =
+            state.startLon + (state.endLon - state.startLon) * easeProgress
+          if (
+            Math.abs(lat - v.lat) < POSITION_EPSILON &&
+            Math.abs(lon - v.lon) < POSITION_EPSILON
+          ) {
+            return v
+          }
+          changed = true
+          return { ...v, lat, lon }
+        })
+
+        return changed ? next : prev
+      })
+
+      if (hasActiveAnimation) {
+        animRef.current = requestAnimationFrame(animate)
+        return
+      }
+
+      animStatesRef.current.clear()
+      animRef.current = undefined
+    }
+
+    animRef.current = requestAnimationFrame(animate)
+  }, [])
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -116,21 +184,30 @@ function App() {
     let cancelled = false
     let etag: string | undefined
     let lastModified: string | undefined
+    let fetchController: AbortController | null = null
 
     const sleep = (ms: number) =>
       new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+
+    const isAbortError = (error: unknown) =>
+      error instanceof DOMException && error.name === 'AbortError'
 
     const loop = async () => {
       while (!cancelled) {
         let nextDelay = POLL_MS
         try {
+          fetchController = new AbortController()
           const response = await fetch(GPS_URL, {
             cache: 'no-cache',
             headers: {
               ...(etag ? { 'If-None-Match': etag } : {}),
               ...(lastModified ? { 'If-Modified-Since': lastModified } : {}),
             },
+            signal: fetchController.signal,
           })
+          fetchController = null
+
+          if (cancelled) break
 
           if (response.status === 304) {
             nextDelay = 1_500
@@ -138,6 +215,7 @@ function App() {
             etag = response.headers.get('etag') ?? etag
             lastModified = response.headers.get('last-modified') ?? lastModified
             const text = await response.text()
+            if (cancelled) break
             const parsedRaw = parseGpsFeed(text)
             const parsed = parsedRaw.filter((v) => v.route === ROUTE_ID)
             setVehicles(parsed)
@@ -148,11 +226,14 @@ function App() {
             throw new Error(`HTTP ${response.status}`)
           }
         } catch (err) {
+          fetchController = null
+          if (cancelled && isAbortError(err)) break
           const message = err instanceof Error ? err.message : 'Unknown error'
-          setError(message)
+          if (!cancelled) setError(message)
           nextDelay = 5_000
         }
 
+        if (cancelled) break
         await sleep(nextDelay)
       }
     }
@@ -160,17 +241,20 @@ function App() {
     loop()
     return () => {
       cancelled = true
+      fetchController?.abort()
     }
   }, [])
 
   useEffect(() => {
     let cancelled = false
+    const controller = new AbortController()
     const fetchRoute = async () => {
       setRouteData({ ab: [], ba: [] })
       setRouteError(null)
       try {
-        const response = await fetch(ROUTE_URL)
+        const response = await fetch(ROUTE_URL, { signal: controller.signal })
         if (!response.ok) {
+          if (cancelled) return
           setRouteError(`Route fetch failed (${response.status})`)
           return
         }
@@ -206,29 +290,36 @@ function App() {
           setRouteError('No route shape found')
         }
       } catch (err) {
+        if (controller.signal.aborted || cancelled) return
         const message = err instanceof Error ? err.message : 'Failed to fetch route'
-        if (!cancelled) setRouteError(message)
+        setRouteError(message)
       }
     }
 
     fetchRoute()
     return () => {
       cancelled = true
+      controller.abort()
     }
   }, [])
 
   useEffect(() => {
-    setRenderVehicles((prev) => {
-      const prevMap = new Map(prev.map((v) => [v.vehicleId, v]))
-      const now = performance.now()
-      const ANIM_DURATION = 2_500
+    const prev = renderVehiclesRef.current
+    const prevMap = new Map(prev.map((v) => [v.vehicleId, v]))
+    const now = performance.now()
+    const ANIM_DURATION = 2_500
 
-      const nextAnimStates = new Map<string, AnimState>()
-      const nextRenderVehicles = vehicles.map((v) => {
-        const prevV = prevMap.get(v.vehicleId)
-        const startLat = prevV?.lat ?? v.lat
-        const startLon = prevV?.lon ?? v.lon
+    const nextAnimStates = new Map<string, AnimState>()
+    const nextRenderVehicles = vehicles.map((v) => {
+      const prevV = prevMap.get(v.vehicleId)
+      const startLat = prevV?.lat ?? v.lat
+      const startLon = prevV?.lon ?? v.lon
+      const hasMoved =
+        !!prevV &&
+        (Math.abs(prevV.lat - v.lat) > POSITION_EPSILON ||
+          Math.abs(prevV.lon - v.lon) > POSITION_EPSILON)
 
+      if (hasMoved) {
         nextAnimStates.set(v.vehicleId, {
           vehicleId: v.vehicleId,
           startLat,
@@ -238,33 +329,28 @@ function App() {
           startTime: now,
           duration: ANIM_DURATION,
         })
-
         return { ...v, lat: startLat, lon: startLon }
-      })
+      }
 
-      animStatesRef.current = nextAnimStates
-      return nextRenderVehicles
+      return v
     })
-  }, [vehicles])
+
+    animStatesRef.current = nextAnimStates
+    setRenderVehicles(nextRenderVehicles)
+
+    if (nextAnimStates.size > 0) {
+      startAnimationLoop()
+    } else if (animRef.current !== undefined) {
+      cancelAnimationFrame(animRef.current)
+      animRef.current = undefined
+    }
+  }, [vehicles, startAnimationLoop])
 
   useEffect(() => {
-    const animate = () => {
-      const now = performance.now()
-      setRenderVehicles((prev) => {
-        return prev.map((v) => {
-          const state = animStatesRef.current.get(v.vehicleId)
-          if (!state) return v
-          const elapsed = now - state.startTime
-          const progress = Math.min(elapsed / state.duration, 1)
-          const easeProgress = progress < 1 ? progress * progress * (3 - 2 * progress) : 1
-          const lat = state.startLat + (state.endLat - state.startLat) * easeProgress
-          const lon = state.startLon + (state.endLon - state.startLon) * easeProgress
-          return { ...v, lat, lon }
-        })
-      })
-      animRef.current = requestAnimationFrame(animate)
-    }
-    animRef.current = requestAnimationFrame(animate)
+    renderVehiclesRef.current = renderVehicles
+  }, [renderVehicles])
+
+  useEffect(() => {
     return () => {
       if (animRef.current !== undefined) cancelAnimationFrame(animRef.current)
     }
@@ -392,7 +478,7 @@ function App() {
               <Marker
                 key={`${vehicle.route}-${vehicle.vehicleId}`}
                 position={[vehicle.lat, vehicle.lon]}
-                icon={createHeadingIcon(vehicle.headingDeg)}
+                icon={getHeadingIcon(vehicle.headingDeg)}
               >
                 <Popup>
                   <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
